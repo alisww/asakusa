@@ -81,6 +81,25 @@ async fn fix(
     #[flag]
     bold: bool,
 ) -> Result<(), Error> {
+    let self_id = ctx.discord().cache.current_user_id();
+    let self_role = ctx
+        .guild_id()
+        .unwrap()
+        .roles(&ctx.discord())
+        .await?
+        .into_values()
+        .find(|r| r.tags.bot_id.is_some() && r.tags.bot_id.unwrap() == self_id)
+        .unwrap();
+
+    if self_role.position < role.position {
+        ctx.say(format!(
+            "that role is above me on the hierarchy; put the {} role above it to enable editing.",
+            self_role
+        ))
+        .await?;
+        return Ok(());
+    }
+
     let current_color = role.colour;
     let (color, _) = DEFAULT_PALETTE.find_closest(
         [current_color.r(), current_color.g(), current_color.b()],
@@ -242,6 +261,7 @@ async fn main() {
         .options(poise::FrameworkOptions {
             owners: HashSet::from([serenity::UserId(722196443514798181)]),
             commands: vec![fix(), match_color()],
+            on_error: |error| Box::pin(on_error(error)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("~kanamori".into()),
                 ..Default::default()
@@ -251,4 +271,8 @@ async fn main() {
         .run()
         .await
         .unwrap();
+}
+
+async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+    println!("aw damnit {:#?}", error);
 }
