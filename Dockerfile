@@ -5,7 +5,6 @@ WORKDIR /asakusa
 COPY src /asakusa/src
 COPY Cargo.toml .
 COPY Cargo.lock .
-COPY usage.md .
 COPY templates /asakusa/templates
 
 RUN cargo build --release
