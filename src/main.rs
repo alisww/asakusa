@@ -103,7 +103,7 @@ async fn fix(
     let current_color = role.colour;
     let (color, _) = DEFAULT_PALETTE.find_closest(
         [current_color.r(), current_color.g(), current_color.b()],
-        ColorDistance::CIE94,
+        ColorDistance::CIEDE2000,
     );
 
     let dark = render_template(color, DISCORD_DARK_MODE, bold);
@@ -186,7 +186,7 @@ async fn match_color(
     bold: bool,
 ) -> Result<(), Error> {
     let current_color = [current_color.r, current_color.g, current_color.b];
-    let (color, _) = DEFAULT_PALETTE.find_closest(current_color, ColorDistance::CIE94);
+    let (color, _) = DEFAULT_PALETTE.find_closest(current_color, ColorDistance::CIEDE2000);
 
     let cur_dark = render_template(current_color, DISCORD_DARK_MODE, bold);
     let cur_light = render_template(current_color, DISCORD_LIGHT_MODE, bold);
@@ -206,7 +206,8 @@ async fn match_color(
         interaction
             .create_followup_message(http, |m| {
                 m.content(format!(
-                    "**specified color**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
+                    "**specified color ({})**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
+                    HexColor::new(current_color[0],current_color[1],current_color[2]),
                     cur_contrast_dark, cur_contrast_light
                 )).files([
                     (&cur_light[..], "light_mode.png"),
