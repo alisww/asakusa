@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="svg5" width="421" height="81" version="1.1" viewBox="0 0 111.39 21.431" xmlns="http://www.w3.org/2000/svg">
+ <g id="layer1" transform="translate(-49.538 -124.38)">
+  <rect id="rect846" x="49.538" y="124.38" width="111.51" height="21.515" fill="{{ background }}" fill-rule="evenodd" stop-color="#000000" stroke-width=".040378"/>
+  <text id="text6656" transform="matrix(.26458 0 0 .26458 10.331 2.0878)" font-family="sans-serif" font-size="16px" word-spacing="0px" style="line-height:1.05;shape-inside:url(#rect6658);white-space:pre" xml:space="preserve"><tspan id="tspan999" x="198.88477" y="506.97961"><tspan id="tspan997" fill="{{ foreground }}" font-family="sans-serif">the quick brown fox jumps over the lazy dog.</tspan></tspan></text>
+ </g>
+</svg>

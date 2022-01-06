@@ -1,0 +1,29 @@
+[package]
+name = "asakusa"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+resvg = "0.20"
+usvg = "0.20"
+tiny-skia = "0.6.1"
+lazy_static = "1.4"
+hex_color = "1.0"
+askama = "0.10"
+
+[dependencies.light-and-shadow]
+git = "https://github.com/alisww/light-and-shadow.git"
+branch = "main"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.serenity]
+version = "0.10.9"
+default-features = false
+features = ["client", "gateway", "rustls_backend", "model"]
+
+[dependencies.tokio]
+version = "1.0"
+features = ["macros", "rt-multi-thread"]
