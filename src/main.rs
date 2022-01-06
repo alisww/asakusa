@@ -9,6 +9,7 @@ use askama::Template;
 use hex_color::HexColor; // i am lazy
 use lazy_static::lazy_static;
 use light_and_shadow::{contrast_rgb, ColorDistance, Palette};
+use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
 
@@ -17,6 +18,7 @@ use std::time::Duration;
 struct SvgTemplate {
     foreground: String,
     background: String,
+    font: String,
 }
 
 static DISCORD_DARK_MODE: [u8; 3] = [54, 57, 64];
@@ -31,17 +33,26 @@ lazy_static! {
         opt.resources_dir = std::fs::canonicalize(env::current_dir().unwrap())
             .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-        opt.fontdb.load_font_file("./opensans.otf").unwrap();
-        opt.fontdb.set_sans_serif_family("Open Sans");
+        opt.fontdb
+            .load_font_file("./open-sans/opensans-medium.otf")
+            .unwrap();
+        opt.fontdb
+            .load_font_file("./open-sans/opensans.otf")
+            .unwrap();
 
         opt
     };
 }
 
-fn render_template(fg: [u8; 3], bg: [u8; 3]) -> Vec<u8> {
+fn render_template(fg: [u8; 3], bg: [u8; 3], bold: bool) -> Vec<u8> {
     let svg_data = SvgTemplate {
         foreground: format!("rgb({},{},{})", fg[0], fg[1], fg[2]),
         background: format!("rgb({},{},{})", bg[0], bg[1], bg[2]),
+        font: if bold {
+            "'Open Sans Medium'".to_owned()
+        } else {
+            "'Open Sans'".to_owned()
+        },
     }
     .render()
     .unwrap();
@@ -66,6 +77,9 @@ fn render_template(fg: [u8; 3], bg: [u8; 3]) -> Vec<u8> {
 async fn fix(
     ctx: Context<'_>,
     #[description = "role to modify"] role: serenity::Role,
+    #[description = "display preview with username font-weight"]
+    #[flag]
+    bold: bool,
 ) -> Result<(), Error> {
     let current_color = role.colour;
     let (color, _) = DEFAULT_PALETTE.find_closest(
@@ -73,8 +87,8 @@ async fn fix(
         ColorDistance::CIE94,
     );
 
-    let dark = render_template(color, DISCORD_DARK_MODE);
-    let light = render_template(color, DISCORD_LIGHT_MODE);
+    let dark = render_template(color, DISCORD_DARK_MODE, bold);
+    let light = render_template(color, DISCORD_LIGHT_MODE, bold);
 
     let contrast_light = contrast_rgb(color, DISCORD_LIGHT_MODE);
     let contrast_dark = contrast_rgb(color, DISCORD_DARK_MODE);
@@ -148,18 +162,21 @@ async fn fix(
 async fn match_color(
     ctx: Context<'_>,
     #[description = "color to match"] current_color: HexColor,
+    #[description = "display preview with username font-weight"]
+    #[flag]
+    bold: bool,
 ) -> Result<(), Error> {
     let current_color = [current_color.r, current_color.g, current_color.b];
     let (color, _) = DEFAULT_PALETTE.find_closest(current_color, ColorDistance::CIE94);
 
-    let cur_dark = render_template(current_color, DISCORD_DARK_MODE);
-    let cur_light = render_template(current_color, DISCORD_LIGHT_MODE);
+    let cur_dark = render_template(current_color, DISCORD_DARK_MODE, bold);
+    let cur_light = render_template(current_color, DISCORD_LIGHT_MODE, bold);
 
     let cur_contrast_dark = contrast_rgb(current_color, DISCORD_DARK_MODE);
     let cur_contrast_light = contrast_rgb(current_color, DISCORD_LIGHT_MODE);
 
-    let dark = render_template(color, DISCORD_DARK_MODE);
-    let light = render_template(color, DISCORD_LIGHT_MODE);
+    let dark = render_template(color, DISCORD_DARK_MODE, bold);
+    let light = render_template(color, DISCORD_LIGHT_MODE, bold);
 
     let contrast_light = contrast_rgb(color, DISCORD_LIGHT_MODE);
     let contrast_dark = contrast_rgb(color, DISCORD_DARK_MODE);
@@ -195,20 +212,36 @@ async fn match_color(
     Ok(())
 }
 
-#[poise::command(prefix_command, hide_in_help)]
-async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
-    poise::builtins::register_application_commands(ctx, global).await?;
-
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() {
     poise::Framework::build()
         .token(std::env::var("DISCORD_TOKEN").unwrap())
-        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(()) }))
+        .user_data_setup(move |ctx, _ready, framework| {
+            Box::pin(async move {
+                let mut commands_builder = serenity::CreateApplicationCommands::default();
+                let commands = &framework.options().commands;
+                for command in commands {
+                    if let Some(slash_command) = command.create_as_slash_command() {
+                        commands_builder.add_application_command(slash_command);
+                    }
+                    if let Some(context_menu_command) = command.create_as_context_menu_command() {
+                        commands_builder.add_application_command(context_menu_command);
+                    }
+                }
+
+                let commands_builder = serenity::json::Value::Array(commands_builder.0);
+                println!("registering {} commands as global", commands.len());
+
+                ctx.http
+                    .create_global_application_commands(&commands_builder)
+                    .await?;
+
+                Ok(())
+            })
+        })
         .options(poise::FrameworkOptions {
-            commands: vec![fix(), register(), match_color()],
+            owners: HashSet::from([serenity::UserId(722196443514798181)]),
+            commands: vec![fix(), match_color()],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("~kanamori".into()),
                 ..Default::default()

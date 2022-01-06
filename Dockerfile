@@ -25,7 +25,7 @@ RUN chmod +x asakusa
 
 USER asakusa:asakusa
 
-COPY opensans.otf .
+COPY open-sans /home/asakusa/open-sans
 
 
 CMD ["./asakusa"]
