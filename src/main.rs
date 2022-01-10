@@ -98,13 +98,13 @@ async fn fix(
         ))
         .await?;
         return Ok(());
+    } else {
+        ctx.defer().await?;
     }
 
     let current_color = role.colour;
-    let (color, _) = DEFAULT_PALETTE.find_closest(
-        [current_color.r(), current_color.g(), current_color.b()],
-        
-    );
+    let (color, _) =
+        DEFAULT_PALETTE.find_closest([current_color.r(), current_color.g(), current_color.b()]);
 
     let dark = render_template(color, DISCORD_DARK_MODE, bold);
     let light = render_template(color, DISCORD_LIGHT_MODE, bold);
@@ -112,23 +112,21 @@ async fn fix(
     let contrast_light = contrast_rgb(color, DISCORD_LIGHT_MODE);
     let contrast_dark = contrast_rgb(color, DISCORD_DARK_MODE);
 
-    let handle = ctx
+    let reply_handle = ctx
         .send(|m| {
             m.content(format!(
-                "closest color found for role {}: {}\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
+                "**Proposal for role {}:** {old_color} -> {new_color}\n**Contrast changes:** (☀️  {old_light:.2} -> {new_light:.2}) (🌑 {old_dark:.2} -> {new_dark:.2})",
                 role,
-                HexColor::new(color[0], color[1], color[2]),
-                contrast_dark,
-                contrast_light
+                old_color = HexColor::new(current_color.r(), current_color.g(), current_color.b()),
+                new_color = HexColor::new(color[0], color[1], color[2]),
+                old_light = contrast_rgb([current_color.r(), current_color.g(), current_color.b()], DISCORD_LIGHT_MODE),
+                new_light = contrast_light,
+                old_dark = contrast_rgb([current_color.r(), current_color.g(), current_color.b()], DISCORD_DARK_MODE),
+                new_dark = contrast_dark
             ))
-        })
-        .await?
-        .unwrap();
-    if let poise::ReplyHandle::Application { http, interaction } = handle {
-        let reply = interaction
-            .create_followup_message(http, |m| {
-                m.files([(&light[..], "light_mode.png"), (&dark[..], "dark_mode.png")])
-                    .components(|c| {
+            .attachment((&light[..], "light_mode.png").into())
+            .attachment((&dark[..], "dark_mode.png").into())
+            .components(|c| {
                         c.create_action_row(|r| {
                             r.create_button(|b| {
                                 b.style(serenity::ButtonStyle::Success)
@@ -143,28 +141,29 @@ async fn fix(
                         })
                     })
             })
-            .await?;
+            .await?
+            .unwrap();
 
-        if let Some(res) = reply
-            .await_component_interaction(&ctx.discord())
+    if let poise::ReplyHandle::Application { http, interaction } = reply_handle {
+        if let Some(res) = serenity::CollectComponentInteraction::new(&ctx.discord())
             .author_id(ctx.author().id)
-            .message_id(reply.id)
+            .channel_id(ctx.channel_id())
             .timeout(Duration::from_secs(60 * 5))
             .await
         {
             if res.data.custom_id == "yes" {
-                role.edit(&http, |new_role| {
+                role.edit(&ctx.discord(), |new_role| {
                     new_role.colour(Colour::from_rgb(color[0], color[1], color[2]).0 as u64)
                 })
                 .await?;
 
-                res.create_interaction_response(&ctx.discord(), |fin| {
-                    fin.interaction_response_data(|d| d.content(format!("role {} edited!", role)))
+                res.create_interaction_response(&ctx.discord(), |m| {
+                    m.interaction_response_data(|d| d.content(format!("role {} edited!", role)))
                 })
                 .await?;
             } else {
-                res.create_interaction_response(&ctx.discord(), |fin| {
-                    fin.interaction_response_data(|d| {
+                res.create_interaction_response(&ctx.discord(), |m| {
+                    m.interaction_response_data(|d| {
                         d.content(format!("okay, keeping role {} as is!", role))
                     })
                 })
@@ -185,6 +184,8 @@ async fn match_color(
     #[flag]
     bold: bool,
 ) -> Result<(), Error> {
+    ctx.defer().await?;
+
     let current_color = [current_color.r, current_color.g, current_color.b];
     let (color, _) = DEFAULT_PALETTE.find_closest(current_color);
 
@@ -200,34 +201,29 @@ async fn match_color(
     let contrast_light = contrast_rgb(color, DISCORD_LIGHT_MODE);
     let contrast_dark = contrast_rgb(color, DISCORD_DARK_MODE);
 
-    let handle = ctx.send(|m| m.content("*calculating...*")).await?.unwrap();
+    ctx.send(|m| {
+        m.content(format!(
+            "**specified color ({})**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
+            HexColor::new(current_color[0], current_color[1], current_color[2]),
+            cur_contrast_dark,
+            cur_contrast_light
+        ))
+        .attachment((&cur_light[..], "light_mode.png").into())
+        .attachment((&cur_dark[..], "dark_mode.png").into())
+    })
+    .await?;
 
-    if let poise::ReplyHandle::Application { http, interaction } = handle {
-        interaction
-            .create_followup_message(http, |m| {
-                m.content(format!(
-                    "**specified color ({})**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
-                    HexColor::new(current_color[0],current_color[1],current_color[2]),
-                    cur_contrast_dark, cur_contrast_light
-                )).files([
-                    (&cur_light[..], "light_mode.png"),
-                    (&cur_dark[..], "dark_mode.png"),
-                ])
-            })
-            .await?;
-
-        interaction
-            .create_followup_message(http, |m| {
-                m.content(format!(
-                "**new color: {}**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
-                HexColor::new(color[0],color[1],color[2]),
-                contrast_dark,
-                contrast_light
-                ))
-                .files([(&light[..], "light_mode.png"), (&dark[..], "dark_mode.png")])
-            })
-            .await?;
-    }
+    ctx.send(|m| {
+        m.content(format!(
+            "**new color: {}**\ncontrast on dark mode: {:.2}\ncontrast on light mode: {:.2}",
+            HexColor::new(color[0], color[1], color[2]),
+            contrast_dark,
+            contrast_light
+        ))
+        .attachment((&light[..], "light_mode.png").into())
+        .attachment((&dark[..], "dark_mode.png").into())
+    })
+    .await?;
 
     Ok(())
 }
