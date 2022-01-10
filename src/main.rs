@@ -8,7 +8,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 use askama::Template;
 use hex_color::HexColor; // i am lazy
 use lazy_static::lazy_static;
-use light_and_shadow::{contrast_rgb, ColorDistance, Palette};
+use light_and_shadow::{contrast_rgb, Palette};
 use std::collections::HashSet;
 use std::env;
 use std::time::Duration;
@@ -103,7 +103,7 @@ async fn fix(
     let current_color = role.colour;
     let (color, _) = DEFAULT_PALETTE.find_closest(
         [current_color.r(), current_color.g(), current_color.b()],
-        ColorDistance::CIEDE2000,
+        
     );
 
     let dark = render_template(color, DISCORD_DARK_MODE, bold);
@@ -186,7 +186,7 @@ async fn match_color(
     bold: bool,
 ) -> Result<(), Error> {
     let current_color = [current_color.r, current_color.g, current_color.b];
-    let (color, _) = DEFAULT_PALETTE.find_closest(current_color, ColorDistance::CIEDE2000);
+    let (color, _) = DEFAULT_PALETTE.find_closest(current_color);
 
     let cur_dark = render_template(current_color, DISCORD_DARK_MODE, bold);
     let cur_light = render_template(current_color, DISCORD_LIGHT_MODE, bold);
